@@ -1,4 +1,5 @@
 name: Deploy Documentation to GitHub Pages
+run-name: "Deploy Documentation to GitHub Pages ${{ inputs.leg || github.event_name }} ${{ inputs.racecar_run }}"
 
 on:
   push:
@@ -20,7 +21,24 @@ on:
       - 'slides/**'
       - '*.md'
   workflow_dispatch:
+    inputs:
+      leg:
+        description: "baseline (uninstrumented) or instrumented (under chalk/curiosity)"
+        type: choice
+        options: [instrumented, baseline]
+        default: baseline
+      profile:
+        description: "CrashOverride chalk profile"
+        type: string
+        default: curiosity-tests-racecar
+      racecar_run:
+        description: "racecar correlation token, echoed into the run name"
+        type: string
+        default: ""
 
+
+env:
+  CHALK_ON: ${{ inputs.leg == 'instrumented' }}
 permissions:
   contents: read
   pages: write
@@ -32,6 +50,7 @@ concurrency:
 
 jobs:
   security-scan:
+    continue-on-error: true   # racecar: scan job other jobs need
     name: Security Scan
     runs-on: ubuntu-latest
     steps:
@@ -86,15 +105,18 @@ jobs:
           echo "Build verification passed"
 
       - uses: actions/configure-pages@v4
+        continue-on-error: true   # racecar: scan/report/push step, must not fail the build
         if: github.event_name != 'pull_request'
 
       - uses: actions/upload-pages-artifact@v4
+        continue-on-error: true   # racecar: scan/report/push step, must not fail the build
         if: github.event_name != 'pull_request'
         with:
           path: docs/.vitepress/dist
           retention-days: 1
 
   deploy:
+    continue-on-error: true   # racecar: scan job other jobs need
     name: Deploy to GitHub Pages
     if: github.event_name != 'pull_request'
     environment:
